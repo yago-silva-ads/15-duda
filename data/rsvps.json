@@ -1,0 +1,46 @@
+[
+  {
+    "id": "demo-1",
+    "name": "Camila Andrade",
+    "phone": "(11) 98712-3456",
+    "status": "confirmed",
+    "adults": 2,
+    "kids": 0,
+    "bringingSwimwear": true,
+    "message": "Amigaaa, ansiosa pelo XV! Look 2000s já tá separado! 🎉",
+    "createdAt": "2026-09-27T15:40:31.314Z"
+  },
+  {
+    "id": "demo-2",
+    "name": "Matheus Guimarães",
+    "phone": "(11) 97123-8899",
+    "status": "declined",
+    "adults": 1,
+    "kids": 0,
+    "bringingSwimwear": false,
+    "message": "Duda, infelizmente vou estar viajando no fim de semana, mas mando seu presente com a Ju! Parabéns antecipado ❤️",
+    "createdAt": "2026-09-27T21:40:31.314Z"
+  },
+  {
+    "id": "demo-3",
+    "name": "Larissa & Família",
+    "phone": "(11) 99345-1278",
+    "status": "confirmed",
+    "adults": 2,
+    "kids": 1,
+    "bringingSwimwear": true,
+    "message": "Vamos todos comemorar com você! Criança vai levar boia!",
+    "createdAt": "2026-09-28T07:40:31.314Z"
+  },
+  {
+    "id": "demo-4",
+    "name": "Rodrigo Silveira",
+    "phone": "(11) 98234-5678",
+    "status": "declined",
+    "adults": 1,
+    "kids": 0,
+    "bringingSwimwear": false,
+    "message": "Poxa Duda, terei plantão no dia. Aproveita muito sua festa!",
+    "createdAt": "2026-09-28T13:40:31.314Z"
+  }
+]

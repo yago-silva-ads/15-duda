@@ -1,0 +1,6 @@
+{
+  "name": "XV da Duda - Convite Interativo",
+  "description": "Convite digital interativo para a festa de 15 anos da Duda: abertura animada, dress code anos 2000, localização, confirmação via WhatsApp e lista de presentes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

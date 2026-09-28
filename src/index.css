@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+@layer utilities {
+  .font-script {
+    font-family: 'Dancing Script', 'Alex Brush', cursive;
+    font-weight: 700;
+  }
+  .font-vibes {
+    font-family: 'Marck Script', 'Great Vibes', cursive;
+  }
+  .font-montecarlo {
+    font-family: 'Dancing Script', 'Alex Brush', cursive;
+  }
+  .font-serif-display {
+    font-family: 'Playfair Display', serif;
+  }
+  .font-cinzel {
+    font-family: 'Cinzel', serif;
+  }
+}
+
+/* Custom text shadow for the metallic / vibrant red script typography */
+.text-red-glow {
+  text-shadow: 0 2px 8px rgba(185, 28, 28, 0.4), 0 0 20px rgba(220, 38, 38, 0.2);
+}
+
+.text-gold-glow {
+  text-shadow: 0 1px 4px rgba(217, 119, 6, 0.3);
+}
+
+/* Paper textures and noise overlay */
+.bg-paper-texture {
+  background-color: #f7f4ee;
+  background-image: 
+    radial-gradient(at 80% 20%, rgba(240, 230, 215, 0.7) 0px, transparent 50%),
+    radial-gradient(at 10% 70%, rgba(225, 215, 195, 0.5) 0px, transparent 50%);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(185, 28, 28, 0.5);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(185, 28, 28, 0.8);
+}
