@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { MessageCircle, CheckCircle2, XCircle, Users, X, Send, Sparkles, Phone, Table, Check, Search, Calendar, Heart } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
+import { Check, ChevronLeft, Minus, Plus, X } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { INVITATION_DATA } from '../data/invitationData';
-import { submitRsvp, fetchRsvps, RsvpEntry } from '../services/rsvpService';
+import { submitRsvp, RsvpEntry } from '../services/rsvpService';
 import { sound } from '../utils/audio';
 
 interface RsvpModalProps {
@@ -13,97 +12,89 @@ interface RsvpModalProps {
   initialTab?: 'form' | 'list';
 }
 
-export const RsvpModal: React.FC<RsvpModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  onOpenSpreadsheet,
-  initialTab = 'form'
-}) => {
-  const [activeTab, setActiveTab] = useState<'form' | 'list'>(initialTab);
+type Attendance = 'yes' | 'no' | '';
+
+export const RsvpModal: React.FC<RsvpModalProps> = ({ isOpen, onClose }) => {
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [guestName, setGuestName] = useState('');
   const [phone, setPhone] = useState('');
-  const [status, setStatus] = useState<'yes' | 'no'>('yes');
+  const [status, setStatus] = useState<Attendance>('');
   const [adultsCount, setAdultsCount] = useState(1);
   const [kidsCount, setKidsCount] = useState(0);
   const [bringingSwimwear, setBringingSwimwear] = useState(true);
   const [customMessage, setCustomMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
   const [userAlreadyRegistered, setUserAlreadyRegistered] = useState<RsvpEntry | null>(null);
 
-  // Lista de confirmados
-  const [confirmedList, setConfirmedList] = useState<RsvpEntry[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [loadingList, setLoadingList] = useState(false);
-
-  // Carregar registro prévio do usuário e lista de confirmados
   useEffect(() => {
-    if (isOpen) {
-      try {
-        const saved = localStorage.getItem('duda_user_rsvp');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          setUserAlreadyRegistered(parsed);
-          setGuestName(parsed.name || '');
-          setPhone(parsed.phone || '');
-        }
-      } catch {
-        //
+    if (!isOpen) return;
+    setError('');
+    setStep(1);
+    try {
+      const saved = localStorage.getItem('duda_user_rsvp');
+      if (saved) {
+        const parsed: RsvpEntry = JSON.parse(saved);
+        setUserAlreadyRegistered(parsed);
+        setGuestName(parsed.name || '');
+        setPhone(parsed.phone || '');
+        setStatus(parsed.status === 'confirmed' ? 'yes' : 'no');
+        setAdultsCount(Math.max(1, parsed.adults || 1));
+        setKidsCount(Math.max(0, parsed.kids || 0));
+        setBringingSwimwear(Boolean(parsed.bringingSwimwear));
+        setCustomMessage(parsed.message || '');
+      } else {
+        setUserAlreadyRegistered(null);
       }
-      loadConfirmedList();
+    } catch {
+      setUserAlreadyRegistered(null);
     }
   }, [isOpen]);
 
-  const loadConfirmedList = async () => {
-    setLoadingList(true);
-    try {
-      const all = await fetchRsvps();
-      const onlyConfirmed = all.filter((r) => r.status === 'confirmed');
-      setConfirmedList(onlyConfirmed);
-    } catch {
-      //
-    } finally {
-      setLoadingList(false);
-    }
-  };
+  const rawPhone = useMemo(() => phone.replace(/\D/g, ''), [phone]);
 
   if (!isOpen) return null;
 
-  // Formatação de telefone no formato brasileiro (XX) XXXXX-XXXX
-  const handlePhoneChange = (val: string) => {
-    const raw = val.replace(/\D/g, '').slice(0, 11);
+  const handlePhoneChange = (value: string) => {
+    const raw = value.replace(/\D/g, '').slice(0, 11);
     let formatted = raw;
-    if (raw.length > 2) {
-      formatted = `(${raw.slice(0, 2)}) ${raw.slice(2)}`;
-    }
-    if (raw.length > 7) {
-      formatted = `(${raw.slice(0, 2)}) ${raw.slice(2, 7)}-${raw.slice(7)}`;
-    }
+    if (raw.length > 2) formatted = `(${raw.slice(0, 2)}) ${raw.slice(2)}`;
+    if (raw.length > 7) formatted = `(${raw.slice(0, 2)}) ${raw.slice(2, 7)}-${raw.slice(7)}`;
     setPhone(formatted);
+    setError('');
   };
 
-  const triggerConfetti = () => {
-    confetti({
-      particleCount: 90,
-      spread: 75,
-      origin: { y: 0.6 },
-      colors: ['#e11d48', '#fb7185', '#fbbf24', '#f43f5e', '#ffffff'],
-    });
+  const validateIdentity = () => {
+    if (guestName.trim().length < 3) {
+      setError('Digite seu nome completo.');
+      return false;
+    }
+    if (rawPhone.length < 10) {
+      setError('Digite um WhatsApp válido com DDD.');
+      return false;
+    }
+    setError('');
+    return true;
   };
 
-  const handleSubmit = async (e: React.FormEvent, sendToWhatsapp: boolean = false) => {
-    e.preventDefault();
-    if (!guestName.trim()) {
-      alert('Por favor, informe seu nome.');
+  const goNext = () => {
+    sound.playClick();
+    if (!validateIdentity()) return;
+    setStep(2);
+  };
+
+  const handleSubmit = async () => {
+    if (!validateIdentity()) {
+      setStep(1);
       return;
     }
-
-    const rawDigits = phone.replace(/\D/g, '');
-    if (rawDigits.length < 10) {
-      alert('Por favor, informe um número de telefone com DDD válido (Ex: (11) 98765-4321).');
+    if (!status) {
+      setError('Escolha se você vai ou não à festa.');
       return;
     }
 
     setIsSubmitting(true);
+    setError('');
     const willAttend = status === 'yes';
 
     try {
@@ -117,8 +108,10 @@ export const RsvpModal: React.FC<RsvpModalProps> = ({
         message: customMessage.trim(),
       });
 
-      const registeredData: RsvpEntry = {
-        id: result.data?.id || `user-${Date.now()}`,
+      if (!result.success) throw new Error(result.error || 'Não foi possível salvar sua resposta.');
+
+      const saved: RsvpEntry = result.data || {
+        id: `user-${Date.now()}`,
         name: guestName.trim(),
         phone: phone.trim(),
         status: willAttend ? 'confirmed' : 'declined',
@@ -129,62 +122,34 @@ export const RsvpModal: React.FC<RsvpModalProps> = ({
         createdAt: new Date().toISOString(),
       };
 
-      try {
-        localStorage.setItem('duda_user_rsvp', JSON.stringify(registeredData));
-        setUserAlreadyRegistered(registeredData);
-      } catch {
-        //
-      }
+      localStorage.setItem('duda_user_rsvp', JSON.stringify(saved));
+      setUserAlreadyRegistered(saved);
 
       if (willAttend) {
         sound.playCelebration();
-        triggerConfetti();
-        // Atualizar lista e alternar imediatamente para a aba de lista de presença!
-        await loadConfirmedList();
-        setActiveTab('list');
+        confetti({
+          particleCount: 70,
+          spread: 70,
+          origin: { y: 0.68 },
+          colors: ['#7b071c', '#d42738', '#f1ded5', '#ffffff'],
+        });
       } else {
         sound.playClick();
-        onClose();
-        alert('Agradecemos por nos avisar! Sua ausência foi comunicada com carinho à anfitriã.');
       }
 
-      if (sendToWhatsapp) {
-        let text = `*Confirmação de Presença - XV da Duda*\n\n`;
-        text += `👤 *Nome:* ${guestName.trim()}\n`;
-        text += `📱 *Telefone:* ${phone.trim()}\n`;
-        text += `✨ *Presença:* ${willAttend ? 'SIM! Estarei presente para comemorar com você! 🎉' : 'Infelizmente não poderei comparecer 😢'}\n`;
-
-        if (willAttend) {
-          text += `👥 *Total de Pessoas:* ${adultsCount} adulto(s)${kidsCount > 0 ? `, ${kidsCount} criança(s)` : ''}\n`;
-          text += `👙 *Roupa de Banho:* ${bringingSwimwear ? 'Vou levar para curtir a piscina!' : 'Não pretendo entrar na piscina'}\n`;
-          text += `👗 *Dress code:* Ciente do look anos 2000's e proibido vermelho/oncinha! 😉\n`;
-        }
-
-        if (customMessage.trim()) {
-          text += `💌 *Recadinho para a Duda:* "${customMessage.trim()}"\n`;
-        }
-
-        const encoded = encodeURIComponent(text);
-        const whatsappUrl = `https://wa.me/${INVITATION_DATA.contactPhone}?text=${encoded}`;
-        setTimeout(() => {
-          window.open(whatsappUrl, '_blank');
-        }, 500);
-      }
-    } catch (err) {
+      setStep(3);
+    } catch (err: any) {
       console.error(err);
-      alert('Ocorreu um erro ao salvar sua confirmação. Tente novamente.');
+      setError(err?.message || 'Não foi possível enviar. Tente novamente.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Filtragem da lista de presença
-  const filteredGuests = confirmedList.filter((g) =>
-    g.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (g.message && g.message.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
-
-  const totalPeopleConfirmed = confirmedList.reduce((acc, curr) => acc + (curr.adults || 1) + (curr.kids || 0), 0);
+  const close = () => {
+    sound.playClick();
+    onClose();
+  };
 
   return (
     <AnimatePresence>
@@ -192,396 +157,213 @@ export const RsvpModal: React.FC<RsvpModalProps> = ({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
-        onClick={() => {
-          sound.playClick();
-          onClose();
-        }}
+        className="fixed inset-0 z-50 bg-black/35 backdrop-blur-md flex items-end sm:items-center justify-center"
+        onClick={close}
       >
-        <motion.div
-          initial={{ scale: 0.92, y: 15 }}
-          animate={{ scale: 1, y: 0 }}
-          exit={{ scale: 0.92, y: 15 }}
-          onClick={(e) => e.stopPropagation()}
-          className="bg-[#240a0e] border border-rose-600/40 rounded-2xl max-w-md w-full p-4 sm:p-5 text-stone-100 shadow-2xl relative my-auto max-h-[92vh] overflow-y-auto"
+        <motion.section
+          initial={{ y: 34, opacity: 0, scale: .99 }}
+          animate={{ y: 0, opacity: 1, scale: 1 }}
+          exit={{ y: 28, opacity: 0, scale: .99 }}
+          transition={{ type: 'spring', damping: 28, stiffness: 360 }}
+          onClick={(event) => event.stopPropagation()}
+          className="w-full sm:max-w-[430px] max-h-[94dvh] overflow-y-auto bg-[#f9f9fb]/98 text-[#1d1d1f] rounded-t-[30px] sm:rounded-[30px] border border-black/10 shadow-[0_30px_90px_rgba(0,0,0,.28)] px-4 sm:px-5 pt-2.5 pb-[max(20px,calc(env(safe-area-inset-bottom)+14px))]"
         >
-          {/* Botão Fechar */}
-          <button
-            onClick={() => {
-              sound.playClick();
-              onClose();
-            }}
-            className="absolute top-4 right-4 p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-stone-300 hover:text-white transition-colors cursor-pointer"
-          >
-            <X size={16} />
-          </button>
+          <div className="w-9 h-1 rounded-full bg-[#d1d1d6] mx-auto mb-3 sm:hidden" />
 
-          {/* Abas Superiores: 1. Confirmar Presença | 2. Lista de Confirmados */}
-          <div className="flex items-center gap-1.5 p-1 bg-black/50 border border-white/10 rounded-xl mb-4 text-xs sm:text-sm font-semibold">
-            <button
-              onClick={() => {
-                sound.playClick();
-                setActiveTab('form');
-              }}
-              className={`flex-1 py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                activeTab === 'form'
-                  ? 'bg-rose-600 text-white shadow-md'
-                  : 'text-stone-300 hover:text-white'
-              }`}
-            >
-              <MessageCircle size={15} />
-              <span>{userAlreadyRegistered ? 'Meu Cadastro' : 'Confirmar Presença'}</span>
-            </button>
+          <div className="flex items-center justify-between min-h-10 mb-1">
+            {step === 2 ? (
+              <button
+                type="button"
+                onClick={() => { setError(''); setStep(1); }}
+                className="w-9 h-9 rounded-full bg-[#ececef] flex items-center justify-center text-[#3a3a3c] active:scale-95 transition-transform"
+                aria-label="Voltar"
+              >
+                <ChevronLeft size={19} />
+              </button>
+            ) : <span className="w-9" />}
+
+            {step < 3 && (
+              <div className="flex items-center gap-1.5" aria-label={`Etapa ${step} de 2`}>
+                <span className={`h-1 rounded-full transition-all ${step >= 1 ? 'w-8 bg-[#7b071c]' : 'w-5 bg-[#d1d1d6]'}`} />
+                <span className={`h-1 rounded-full transition-all ${step >= 2 ? 'w-8 bg-[#7b071c]' : 'w-5 bg-[#d1d1d6]'}`} />
+              </div>
+            )}
 
             <button
-              onClick={() => {
-                sound.playClick();
-                setActiveTab('list');
-              }}
-              className={`flex-1 py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer relative ${
-                activeTab === 'list'
-                  ? 'bg-rose-600 text-white shadow-md'
-                  : 'text-stone-300 hover:text-white'
-              }`}
+              type="button"
+              onClick={close}
+              className="w-9 h-9 rounded-full bg-[#ececef] flex items-center justify-center text-[#3a3a3c] active:scale-95 transition-transform"
+              aria-label="Fechar"
             >
-              <Users size={15} />
-              <span>Lista de Presença</span>
-              {confirmedList.length > 0 && (
-                <span className="px-1.5 py-0.2 bg-white text-rose-950 text-[10px] font-bold rounded-full ml-1">
-                  {confirmedList.length}
-                </span>
-              )}
+              <X size={17} />
             </button>
           </div>
 
-          {/* ABA 1: FORMULÁRIO DE CADASTRO / CONFIRMAÇÃO */}
-          {activeTab === 'form' && (
-            <div className="space-y-4">
-              {userAlreadyRegistered && userAlreadyRegistered.status === 'confirmed' && (
-                <div className="p-3 rounded-xl bg-emerald-950/60 border border-emerald-500/50 flex items-start gap-2.5 shadow-sm">
-                  <CheckCircle2 size={18} className="text-emerald-400 shrink-0 mt-0.5" />
-                  <div className="text-xs sm:text-sm">
-                    <span className="font-bold text-white">Você já está confirmado(a)!</span>
-                    <p className="text-emerald-200 mt-0.5">
-                      Nome: <strong>{userAlreadyRegistered.name}</strong> • Total de {userAlreadyRegistered.adults + userAlreadyRegistered.kids} pessoa(s).
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('list')}
-                      className="mt-1.5 text-xs text-amber-300 font-bold underline hover:text-amber-200 cursor-pointer block"
-                    >
-                      👉 Ver Lista de Presença Oficial ({totalPeopleConfirmed} pessoas)
-                    </button>
-                  </div>
+          {step === 1 && (
+            <div className="pt-2">
+              <p className="text-[10px] tracking-[.17em] font-bold text-[#7b071c] text-center">XV DA DUDA · RSVP</p>
+              <h2 className="text-[32px] leading-[.98] tracking-[-.045em] font-bold text-center mt-2">Quem é você?</h2>
+              <p className="text-[12px] leading-relaxed text-[#6e6e73] text-center mt-2 mb-6">Leva menos de 20 segundos e ajuda a Duda a organizar tudo certinho.</p>
+
+              {userAlreadyRegistered && (
+                <div className="mb-4 rounded-[16px] bg-[#f0f0f4] border border-black/5 p-3 text-[11px] leading-relaxed text-[#6e6e73]">
+                  Já existe uma resposta neste aparelho. Você pode atualizar usando o mesmo WhatsApp.
                 </div>
               )}
 
-              <form onSubmit={(e) => handleSubmit(e, true)} className="space-y-3.5">
-                {/* Status de Presença */}
-                <div>
-                  <label className="block text-sm font-semibold text-stone-200 mb-1.5">
-                    Você irá ao aniversário? *
-                  </label>
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        sound.playClick();
-                        setStatus('yes');
-                      }}
-                      className={`py-2.5 px-3 rounded-xl border text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                        status === 'yes'
-                          ? 'bg-emerald-600/30 border-emerald-500 text-emerald-200 shadow-md ring-1 ring-emerald-500'
-                          : 'bg-black/35 border-white/10 text-stone-400 hover:text-stone-200'
-                      }`}
-                    >
-                      <CheckCircle2 size={16} className={status === 'yes' ? 'text-emerald-400' : ''} />
-                      <span>Confirmado (Vou!)</span>
-                    </button>
+              <label className="block mb-4">
+                <span className="block text-[12px] font-semibold text-[#3a3a3c] mb-1.5">Nome completo</span>
+                <input
+                  autoFocus
+                  type="text"
+                  autoComplete="name"
+                  value={guestName}
+                  onChange={(event) => { setGuestName(event.target.value); setError(''); }}
+                  placeholder="Seu nome"
+                  className="w-full h-[52px] rounded-[15px] bg-white border border-black/10 px-4 text-[16px] outline-none focus:border-[#7b071c]/40 focus:ring-4 focus:ring-[#7b071c]/8 transition-shadow"
+                />
+              </label>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        sound.playClick();
-                        setStatus('no');
-                      }}
-                      className={`py-2.5 px-3 rounded-xl border text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                        status === 'no'
-                          ? 'bg-rose-950/80 border-rose-500 text-rose-200 shadow-md ring-1 ring-rose-500'
-                          : 'bg-black/35 border-white/10 text-stone-400 hover:text-stone-200'
-                      }`}
-                    >
-                      <XCircle size={16} className={status === 'no' ? 'text-rose-400' : ''} />
-                      <span>Não poderei ir</span>
-                    </button>
-                  </div>
-                </div>
+              <label className="block mb-3">
+                <span className="block text-[12px] font-semibold text-[#3a3a3c] mb-1.5">WhatsApp</span>
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  value={phone}
+                  onChange={(event) => handlePhoneChange(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      goNext();
+                    }
+                  }}
+                  placeholder="(11) 99999-9999"
+                  className="w-full h-[52px] rounded-[15px] bg-white border border-black/10 px-4 text-[16px] outline-none focus:border-[#7b071c]/40 focus:ring-4 focus:ring-[#7b071c]/8 transition-shadow"
+                />
+                <small className="block text-[10px] leading-relaxed text-[#8e8e93] mt-1.5 px-1">O número serve para identificar sua resposta e evitar duplicidade.</small>
+              </label>
 
-                {/* Nome Completo */}
-                <div>
-                  <label className="block text-sm font-semibold text-stone-200 mb-1">
-                    Nome Completo *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={guestName}
-                    onChange={(e) => setGuestName(e.target.value)}
-                    placeholder="Ex: Beatriz Lima"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-black/45 border border-white/20 text-stone-100 placeholder:text-stone-500 text-sm sm:text-base focus:outline-hidden focus:border-rose-500 transition-colors"
-                  />
-                </div>
+              {error && <div className="mb-3 rounded-[14px] bg-[#fff0f1] text-[#8a1026] p-3 text-[11px] font-semibold">{error}</div>}
 
-                {/* Telefone / WhatsApp com DDD */}
-                <div>
-                  <label className="block text-sm font-semibold text-stone-200 mb-1 flex items-center gap-1.5">
-                    <Phone size={14} className="text-rose-400" />
-                    <span>Telefone / WhatsApp com DDD *</span>
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    value={phone}
-                    onChange={(e) => handlePhoneChange(e.target.value)}
-                    placeholder="(11) 98765-4321"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-black/45 border border-white/20 text-stone-100 placeholder:text-stone-500 text-sm sm:text-base focus:outline-hidden focus:border-rose-500 font-mono tracking-wider transition-colors"
-                  />
-                </div>
+              <button
+                type="button"
+                onClick={goNext}
+                className="w-full h-[52px] rounded-[16px] bg-[#1d1d1f] text-white text-[14px] font-semibold shadow-md active:scale-[.99] transition-transform"
+              >
+                Continuar
+              </button>
+            </div>
+          )}
 
-                {/* Se Não for, aviso claro de que o número e nome serão registrados na planilha */}
-                {status === 'no' && (
-                  <div className="p-3 rounded-xl bg-rose-950/50 border border-rose-500/40 text-xs sm:text-sm text-rose-200 leading-relaxed font-medium">
-                    Seu nome e número de telefone serão adicionados na aba <strong>"Não Confirmados"</strong> da planilha da anfitriã para controle e organização da festa.
-                  </div>
-                )}
+          {step === 2 && (
+            <div className="pt-2">
+              <p className="text-[10px] tracking-[.17em] font-bold text-[#7b071c] text-center">12 DE DEZEMBRO · 13H ÀS 21H</p>
+              <h2 className="text-[32px] leading-[.98] tracking-[-.045em] font-bold text-center mt-2">Você vai estar lá?</h2>
+              <p className="text-[12px] leading-relaxed text-[#6e6e73] text-center mt-2 mb-5">Escolha uma opção. As duas respostas são importantes para a organização.</p>
 
-                {/* Apenas se for comparecer */}
-                {status === 'yes' && (
-                  <>
-                    {/* Quantidade de Acompanhantes */}
-                    <div className="p-3 rounded-xl bg-black/35 border border-white/15 space-y-2.5">
-                      <div className="flex items-center justify-between text-xs sm:text-sm text-stone-200 font-medium">
-                        <span className="flex items-center gap-1.5">
-                          <Users size={15} className="text-rose-400" />
-                          Adultos confirmados:
-                        </span>
-                        <div className="flex items-center gap-2.5">
-                          <button
-                            type="button"
-                            onClick={() => setAdultsCount(Math.max(1, adultsCount - 1))}
-                            className="w-7 h-7 rounded-lg bg-stone-800 text-stone-200 flex items-center justify-center text-sm font-bold hover:bg-stone-700"
-                          >
-                            -
-                          </button>
-                          <span className="font-mono text-base text-rose-300 font-extrabold w-5 text-center">
-                            {adultsCount}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setAdultsCount(adultsCount + 1)}
-                            className="w-7 h-7 rounded-lg bg-stone-800 text-stone-200 flex items-center justify-center text-sm font-bold hover:bg-stone-700"
-                          >
-                            +
-                          </button>
-                        </div>
-                      </div>
+              <div className="grid gap-2.5 mb-4">
+                <button
+                  type="button"
+                  onClick={() => { sound.playClick(); setStatus('yes'); setError(''); }}
+                  className={`min-h-[70px] rounded-[18px] border p-3 flex items-center gap-3 text-left transition-all ${status === 'yes' ? 'bg-[#f5fff7] border-emerald-500/35 ring-4 ring-emerald-500/6' : 'bg-white border-black/10'}`}
+                >
+                  <span className={`w-11 h-11 rounded-[14px] flex items-center justify-center shrink-0 ${status === 'yes' ? 'bg-emerald-500 text-white' : 'bg-[#f2f2f7] text-[#8e8e93]'}`}>
+                    <Check size={21} />
+                  </span>
+                  <span>
+                    <strong className="block text-[14px]">Sim, eu vou</strong>
+                    <small className="block text-[10.5px] text-[#6e6e73] mt-1">Confirmar minha presença</small>
+                  </span>
+                </button>
 
-                      <div className="flex items-center justify-between text-xs sm:text-sm text-stone-200 font-medium">
-                        <span>Crianças (com roupa de banho):</span>
-                        <div className="flex items-center gap-2.5">
-                          <button
-                            type="button"
-                            onClick={() => setKidsCount(Math.max(0, kidsCount - 1))}
-                            className="w-7 h-7 rounded-lg bg-stone-800 text-stone-200 flex items-center justify-center text-sm font-bold hover:bg-stone-700"
-                          >
-                            -
-                          </button>
-                          <span className="font-mono text-base text-rose-300 font-extrabold w-5 text-center">
-                            {kidsCount}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setKidsCount(kidsCount + 1)}
-                            className="w-7 h-7 rounded-lg bg-stone-800 text-stone-200 flex items-center justify-center text-sm font-bold hover:bg-stone-700"
-                          >
-                            +
-                          </button>
-                        </div>
+                <button
+                  type="button"
+                  onClick={() => { sound.playClick(); setStatus('no'); setError(''); }}
+                  className={`min-h-[70px] rounded-[18px] border p-3 flex items-center gap-3 text-left transition-all ${status === 'no' ? 'bg-[#fff8f9] border-[#7b071c]/30 ring-4 ring-[#7b071c]/5' : 'bg-white border-black/10'}`}
+                >
+                  <span className={`w-11 h-11 rounded-[14px] flex items-center justify-center shrink-0 text-[22px] font-medium ${status === 'no' ? 'bg-[#7b071c] text-white' : 'bg-[#f2f2f7] text-[#8e8e93]'}`}>×</span>
+                  <span>
+                    <strong className="block text-[14px]">Não poderei ir</strong>
+                    <small className="block text-[10.5px] text-[#6e6e73] mt-1">Avisar a Duda</small>
+                  </span>
+                </button>
+              </div>
+
+              {status === 'yes' && (
+                <div className="animate-[fadeIn_.18s_ease-out]">
+                  <div className="rounded-[18px] bg-white border border-black/10 p-3.5 mb-3">
+                    <div className="flex items-center justify-between min-h-10">
+                      <span className="text-[12px] font-semibold">Adultos</span>
+                      <div className="flex items-center gap-3">
+                        <button type="button" onClick={() => setAdultsCount(Math.max(1, adultsCount - 1))} className="w-9 h-9 rounded-full bg-[#f2f2f7] flex items-center justify-center"><Minus size={15} /></button>
+                        <strong className="w-5 text-center text-[15px]">{adultsCount}</strong>
+                        <button type="button" onClick={() => setAdultsCount(Math.min(10, adultsCount + 1))} className="w-9 h-9 rounded-full bg-[#1d1d1f] text-white flex items-center justify-center"><Plus size={15} /></button>
                       </div>
                     </div>
+                    <div className="h-px bg-black/6 my-2" />
+                    <div className="flex items-center justify-between min-h-10">
+                      <span className="text-[12px] font-semibold">Crianças</span>
+                      <div className="flex items-center gap-3">
+                        <button type="button" onClick={() => setKidsCount(Math.max(0, kidsCount - 1))} className="w-9 h-9 rounded-full bg-[#f2f2f7] flex items-center justify-center"><Minus size={15} /></button>
+                        <strong className="w-5 text-center text-[15px]">{kidsCount}</strong>
+                        <button type="button" onClick={() => setKidsCount(Math.min(10, kidsCount + 1))} className="w-9 h-9 rounded-full bg-[#1d1d1f] text-white flex items-center justify-center"><Plus size={15} /></button>
+                      </div>
+                    </div>
+                  </div>
 
-                    {/* Roupa de Banho Checkbox */}
-                    <label className="flex items-center gap-2.5 cursor-pointer text-xs sm:text-sm text-stone-200 select-none font-medium">
-                      <input
-                        type="checkbox"
-                        checked={bringingSwimwear}
-                        onChange={(e) => setBringingSwimwear(e.target.checked)}
-                        className="accent-rose-500 rounded w-4 h-4 cursor-pointer"
-                      />
-                      <span>Vou levar roupa de banho para curtir a piscina</span>
-                    </label>
-                  </>
-                )}
-
-                {/* Mensagem / Motivo */}
-                <div>
-                  <label className="block text-xs sm:text-sm font-semibold text-stone-200 mb-1">
-                    {status === 'yes' ? 'Recado carinhoso para a Duda (opcional)' : 'Motivo ou recado para a Duda (opcional)'}
+                  <label className="flex items-center gap-2.5 rounded-[16px] bg-white border border-black/10 px-3.5 min-h-[50px] mb-3 text-[11px] text-[#3a3a3c]">
+                    <input type="checkbox" checked={bringingSwimwear} onChange={(event) => setBringingSwimwear(event.target.checked)} className="accent-[#7b071c] w-4 h-4" />
+                    Levar roupa de banho para a piscina
                   </label>
+                </div>
+              )}
+
+              {status && (
+                <label className="block mb-3">
+                  <span className="block text-[12px] font-semibold text-[#3a3a3c] mb-1.5">Recado <em className="font-normal text-[#8e8e93] not-italic">(opcional)</em></span>
                   <textarea
                     rows={2}
+                    maxLength={400}
                     value={customMessage}
-                    onChange={(e) => setCustomMessage(e.target.value)}
-                    placeholder={status === 'yes' ? 'Deixe uma mensagem fofa para o grande dia...' : 'Deixe um abraço para a aniversariante...'}
-                    className="w-full px-3.5 py-2 rounded-xl bg-black/45 border border-white/20 text-stone-100 placeholder:text-stone-500 text-xs sm:text-sm focus:outline-hidden focus:border-rose-500 transition-colors"
+                    onChange={(event) => setCustomMessage(event.target.value)}
+                    placeholder={status === 'yes' ? 'Alguma observação para a Duda?' : 'Se quiser, deixe um recadinho ❤️'}
+                    className="w-full min-h-[78px] resize-none rounded-[15px] bg-white border border-black/10 px-4 py-3 text-[15px] outline-none focus:border-[#7b071c]/40 focus:ring-4 focus:ring-[#7b071c]/8"
                   />
-                </div>
+                </label>
+              )}
 
-                {/* Botões de Ação */}
-                <div className="pt-1 flex flex-col gap-2.5">
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className={`w-full py-3 px-4 rounded-xl text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 cursor-pointer ${
-                      status === 'yes'
-                        ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-950/40'
-                        : 'bg-rose-600 hover:bg-rose-500 shadow-rose-950/40'
-                    }`}
-                  >
-                    <Send size={16} />
-                    <span>
-                      {isSubmitting
-                        ? 'Salvando e atualizando lista...'
-                        : status === 'yes'
-                        ? 'Confirmar & Ver Lista de Presença'
-                        : 'Registrar Ausência & Notificar'}
-                    </span>
-                    <Sparkles size={13} className="text-white animate-pulse" />
-                  </button>
+              {error && <div className="mb-3 rounded-[14px] bg-[#fff0f1] text-[#8a1026] p-3 text-[11px] font-semibold">{error}</div>}
 
-                  <button
-                    type="button"
-                    disabled={isSubmitting}
-                    onClick={(e) => handleSubmit(e, false)}
-                    className="w-full py-2.5 px-3 rounded-xl bg-stone-800/80 hover:bg-stone-700 text-stone-200 text-xs sm:text-sm font-medium flex items-center justify-center gap-2 transition-colors border border-white/10"
-                  >
-                    <Check size={14} className="text-emerald-400" />
-                    <span>Salvar apenas no site (sem abrir WhatsApp)</span>
-                  </button>
-                </div>
-              </form>
+              <button
+                type="button"
+                disabled={!status || isSubmitting}
+                onClick={handleSubmit}
+                className="w-full h-[52px] rounded-[16px] bg-[#1d1d1f] text-white text-[14px] font-semibold shadow-md disabled:opacity-35 active:scale-[.99] transition-all"
+              >
+                {isSubmitting ? 'Enviando…' : status === 'yes' ? 'Confirmar presença' : status === 'no' ? 'Enviar resposta' : 'Escolha uma opção'}
+              </button>
+
+              <p className="text-[9.5px] leading-relaxed text-[#8e8e93] text-center mt-2.5 px-3">Nome e telefone são usados somente para organizar a lista de convidados.</p>
             </div>
           )}
 
-          {/* ABA 2: LISTA DE PRESENÇA OFICIAL DOS CONFIRMADOS */}
-          {activeTab === 'list' && (
-            <div className="space-y-3.5">
-              {/* Card de Boas-Vindas e Totalizador */}
-              <div className="bg-gradient-to-r from-rose-950/80 to-stone-900 border border-rose-500/40 rounded-xl p-3.5 flex items-center justify-between shadow-sm">
-                <div>
-                  <h4 className="font-bold text-white text-sm sm:text-base flex items-center gap-1.5">
-                    <span>Lista Oficial de Presença</span>
-                    <Heart size={14} className="fill-rose-500 text-rose-500 inline-block animate-pulse" />
-                  </h4>
-                  <p className="text-xs text-rose-200/90 mt-0.5">
-                    Quem já garantiu presença no XV da Duda
-                  </p>
-                </div>
-                <div className="text-right">
-                  <div className="text-xl sm:text-2xl font-black text-amber-300 font-mono">
-                    {totalPeopleConfirmed}
-                  </div>
-                  <div className="text-[10px] sm:text-xs text-stone-300 font-medium">
-                    pessoas confirmadas
-                  </div>
-                </div>
+          {step === 3 && (
+            <div className="min-h-[430px] flex flex-col items-center justify-center text-center px-3 py-8">
+              <div className={`w-[72px] h-[72px] rounded-[23px] flex items-center justify-center mb-5 ${status === 'yes' ? 'bg-emerald-500 text-white' : 'bg-[#f2f2f7] text-[#7b071c]'}`}>
+                {status === 'yes' ? <Check size={36} strokeWidth={2.5} /> : <span className="text-[38px] leading-none">♡</span>}
               </div>
-
-              {/* Barra de Pesquisa */}
-              <div className="relative">
-                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Buscar amigo ou família na lista..."
-                  className="w-full pl-9 pr-3 py-2 rounded-xl bg-black/40 border border-white/15 text-stone-100 placeholder:text-stone-500 text-xs sm:text-sm focus:outline-hidden focus:border-rose-500 transition-colors"
-                />
-              </div>
-
-              {/* Lista Scrollável de Convidados */}
-              <div className="max-h-[320px] overflow-y-auto space-y-2 pr-1">
-                {loadingList ? (
-                  <div className="text-center py-8 text-xs text-stone-400">
-                    Carregando lista de convidados...
-                  </div>
-                ) : filteredGuests.length === 0 ? (
-                  <div className="text-center py-8 text-xs text-stone-400 bg-black/20 rounded-xl p-4">
-                    {searchTerm ? 'Nenhum convidado encontrado com esse nome.' : 'Seja o primeiro a confirmar presença no XV da Duda!'}
-                  </div>
-                ) : (
-                  filteredGuests.map((guest, idx) => (
-                    <motion.div
-                      key={guest.id || idx}
-                      initial={{ opacity: 0, y: 5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="p-2.5 sm:p-3 rounded-xl bg-black/40 border border-white/10 hover:border-rose-500/30 transition-all flex items-start gap-2.5"
-                    >
-                      {/* Avatar com inicial */}
-                      <div className="w-8 h-8 rounded-full bg-rose-900/60 border border-rose-500/40 text-rose-200 flex items-center justify-center font-bold text-xs shrink-0">
-                        {guest.name.charAt(0).toUpperCase()}
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="font-semibold text-white text-xs sm:text-sm truncate">
-                            {guest.name}
-                          </span>
-                          <span className="text-[10px] text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-500/30 font-medium shrink-0">
-                            Confirmado
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-2 mt-1 text-[11px] text-stone-300">
-                          <span>{guest.adults || 1} adulto(s)</span>
-                          {guest.kids > 0 && <span>• {guest.kids} criança(s)</span>}
-                          {guest.bringingSwimwear && (
-                            <span className="text-cyan-300">• Piscina 🏊</span>
-                          )}
-                        </div>
-
-                        {guest.message && (
-                          <div className="text-[11px] text-rose-200/80 italic mt-1 bg-white/5 p-1.5 rounded-lg border-l-2 border-rose-500">
-                            "{guest.message}"
-                          </div>
-                        )}
-                      </div>
-                    </motion.div>
-                  ))
-                )}
-              </div>
-
-              {/* Botão para Confirmar outra pessoa ou Voltar ao Formulário */}
-              <div className="pt-2 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('form')}
-                  className="flex-1 py-2 px-3 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs font-semibold text-center border border-white/10"
-                >
-                  {userAlreadyRegistered ? 'Alterar Meus Dados' : '+ Confirmar Meu Nome'}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="py-2 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md"
-                >
-                  Fechar
-                </button>
-              </div>
+              <p className="text-[10px] tracking-[.16em] font-bold text-[#7b071c]">RESPOSTA REGISTRADA</p>
+              <h2 className="text-[31px] leading-[1] tracking-[-.045em] font-bold mt-2">{status === 'yes' ? 'Presença confirmada' : 'Obrigada por avisar'}</h2>
+              <p className="max-w-[310px] text-[12px] leading-relaxed text-[#6e6e73] mt-3 mb-6">
+                {status === 'yes'
+                  ? 'Te esperamos no XV da Duda. Se algo mudar, abra o convite novamente e atualize sua resposta.'
+                  : 'Sua ausência foi registrada. Se seus planos mudarem, você pode responder novamente usando o mesmo WhatsApp.'}
+              </p>
+              <button type="button" onClick={close} className="w-full max-w-[310px] h-[52px] rounded-[16px] bg-[#1d1d1f] text-white text-[14px] font-semibold">Voltar ao convite</button>
             </div>
           )}
-        </motion.div>
+        </motion.section>
       </motion.div>
     </AnimatePresence>
   );

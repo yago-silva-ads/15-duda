@@ -1,26 +1,10 @@
 /**
- * @license
- * SPDX-License-Identifier: Apache-2.0
+ * XV da Duda — mobile-first guest experience.
+ * Preserva as artes/componentes originais do projeto e prioriza o RSVP.
  */
-
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { 
-  Sparkles, 
-  Volume2, 
-  VolumeX, 
-  RotateCcw, 
-  Smartphone, 
-  Maximize2, 
-  Gift, 
-  FileText, 
-  Mail, 
-  Share2,
-  Check,
-  Music,
-  Lock,
-  Table
-} from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
+import { Check, Music2, Share2 } from 'lucide-react';
 import { EnvelopeCover } from './components/EnvelopeCover';
 import { MainInvitationCard } from './components/MainInvitationCard';
 import { GiftSuggestionsView } from './components/GiftSuggestionsView';
@@ -28,12 +12,15 @@ import { ObservationsView } from './components/ObservationsView';
 import { LocationModal } from './components/LocationModal';
 import { RsvpModal } from './components/RsvpModal';
 import { CalendarModal } from './components/CalendarModal';
-import { SpreadsheetView } from './components/SpreadsheetView';
-import { fetchRsvps } from './services/rsvpService';
+import { SpotifyMiniPlayer } from './components/SpotifyMiniPlayer';
 import { sound } from './utils/audio';
-import { cozyMusic } from './utils/cozyMusic';
 
-type ActivePage = 'convite' | 'observacoes' | 'presentes' | 'planilha';
+type ActivePage = 'convite' | 'observacoes' | 'presentes';
+
+type LocalRsvp = {
+  name?: string;
+  status?: 'confirmed' | 'declined';
+};
 
 export default function App() {
   const [isEnvelopeOpen, setIsEnvelopeOpen] = useState(false);
@@ -41,213 +28,94 @@ export default function App() {
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [isRsvpModalOpen, setIsRsvpModalOpen] = useState(false);
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
-  const [rsvpModalTab, setRsvpModalTab] = useState<'form' | 'list'>('form');
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const [isMusicPlaying, setIsMusicPlaying] = useState(false);
-  const [isFullScreenView, setIsFullScreenView] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
-  const [rsvpsCount, setRsvpsCount] = useState<number>(0);
+  const [userRsvp, setUserRsvp] = useState<LocalRsvp | null>(null);
 
-  const loadCounts = async () => {
+  const refreshLocalRsvp = () => {
     try {
-      const data = await fetchRsvps();
-      setRsvpsCount(data.length);
+      const saved = localStorage.getItem('duda_user_rsvp');
+      setUserRsvp(saved ? JSON.parse(saved) : null);
     } catch {
-      //
+      setUserRsvp(null);
     }
   };
 
   useEffect(() => {
-    loadCounts();
-  }, [activePage, isRsvpModalOpen]);
-
-  useEffect(() => {
-    const handleFirstTouch = () => {
-      cozyMusic.unlock();
-    };
-    window.addEventListener('touchstart', handleFirstTouch, { passive: true, once: true });
-    window.addEventListener('click', handleFirstTouch, { once: true });
-    return () => {
-      window.removeEventListener('touchstart', handleFirstTouch);
-      window.removeEventListener('click', handleFirstTouch);
-    };
+    refreshLocalRsvp();
+    const onStorage = () => refreshLocalRsvp();
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, []);
 
+  useEffect(() => {
+    if (!isRsvpModalOpen) refreshLocalRsvp();
+  }, [isRsvpModalOpen]);
+
   const handleOpenEnvelope = () => {
-    // Iniciar a música no primeiro toque do celular
-    cozyMusic.unlock();
-    cozyMusic.start();
-    setIsMusicPlaying(true);
+    sound.playClick();
     setIsEnvelopeOpen(true);
-  };
-
-  const handleResetEnvelope = () => {
-    sound.playClick();
-    setIsEnvelopeOpen(false);
-    setActivePage('convite');
-  };
-
-  const toggleSound = () => {
-    const nextState = !soundEnabled;
-    setSoundEnabled(nextState);
-    sound.enabled = nextState;
-  };
-
-  const toggleMusic = () => {
-    sound.playClick();
-    const playing = cozyMusic.toggle();
-    setIsMusicPlaying(playing);
   };
 
   const handleShare = async () => {
     sound.playClick();
+    const data = {
+      title: 'XV da Duda 🍒✨',
+      text: 'Você está convidado para o XV da Duda. Abra o convite e confirme sua presença:',
+      url: window.location.href,
+    };
+
     if (navigator.share) {
       try {
-        await navigator.share({
-          title: 'XV da Duda - Convite Interativo',
-          text: 'Você foi convidado para o XV da Duda no dia 12 de Dezembro! Abra o convite interativo e confirme sua presença:',
-          url: window.location.href,
-        });
+        await navigator.share(data);
         return;
       } catch {
-        // Fallback
+        // usuário cancelou ou navegador não permitiu; usa clipboard abaixo
       }
     }
-    navigator.clipboard.writeText(window.location.href);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2500);
+
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopiedLink(true);
+      window.setTimeout(() => setCopiedLink(false), 2200);
+    } catch {
+      // nada a fazer
+    }
   };
 
+  const statusLabel = userRsvp?.status === 'confirmed'
+    ? 'Presença confirmada'
+    : userRsvp?.status === 'declined'
+      ? 'Resposta enviada'
+      : 'Você vai ao XV da Duda?';
+
+  const statusCaption = userRsvp?.status
+    ? 'Toque para alterar sua resposta'
+    : 'Responda em menos de 20 segundos';
+
   return (
-    <div className="min-h-[100dvh] h-[100dvh] w-full bg-[#1c080c] text-stone-100 flex flex-col items-center justify-center p-0 sm:p-3 md:p-6 overflow-hidden relative selection:bg-rose-700 selection:text-white">
-      {/* Background Decorativo Suave com Tons Vinho e Champanhe */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-1/4 -left-32 w-96 h-96 bg-rose-950/25 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-stone-900/30 rounded-full blur-3xl" />
-        <div 
-          className="absolute inset-0 opacity-10"
-          style={{
-            backgroundImage: `radial-gradient(circle at 50% 50%, rgba(220, 38, 38, 0.05) 0%, transparent 70%)`
-          }}
-        />
-      </div>
+    <div className="min-h-[100dvh] w-full bg-[#ece8e1] text-[#1d1d1f] flex items-center justify-center overflow-hidden relative selection:bg-[#7b071c] selection:text-white">
+      {/* Fundo neutro: deixa o Canva ser protagonista. */}
+      <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(circle_at_50%_10%,rgba(255,255,255,.95),rgba(236,232,225,.86)_42%,rgba(225,219,210,.95)_100%)]" />
 
-      {/* Top Bar no Desktop */}
-      <header className="w-full max-w-2xl hidden sm:flex items-center justify-between py-1.5 px-3 mb-1 z-20 text-xs text-stone-400">
-        <div className="flex items-center gap-2 font-medium text-stone-300">
-          <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-          <span className="tracking-wide">XV da Duda • 12 de Dezembro</span>
-          <span className="text-stone-700">|</span>
-          <button
-            onClick={() => {
-              sound.playClick();
-              setIsEnvelopeOpen(true);
-              setActivePage('planilha');
-            }}
-            className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-stone-900/80 hover:bg-stone-800 border border-white/10 text-stone-400 hover:text-rose-300 text-xs transition-colors"
-            title="Acesso restrito da anfitriã com senha"
-          >
-            <Lock size={11} className="text-rose-400" />
-            <span>Área da Anfitriã</span>
-          </button>
-        </div>
+      <div className="relative z-10 w-full h-[100dvh] sm:h-[860px] sm:max-h-[94vh] max-w-[430px] sm:rounded-[30px] overflow-hidden bg-[#e8e2d8] sm:shadow-[0_30px_90px_rgba(0,0,0,.28)] sm:border sm:border-black/10">
+        <EnvelopeCover isOpen={isEnvelopeOpen} onOpen={handleOpenEnvelope} />
 
-        <div className="flex items-center gap-1.5">
-          {/* Botão de Música Aaliyah R&B Anos 2000 */}
-          <button
-            onClick={toggleMusic}
-            className={`p-1.5 px-3 rounded-lg text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
-              isMusicPlaying
-                ? 'bg-rose-950/90 text-rose-200 border border-rose-500/50 shadow-[0_0_12px_rgba(225,29,72,0.3)]'
-                : 'bg-stone-800/80 text-stone-400 hover:text-white'
-            }`}
-            title={isMusicPlaying ? "Pausar música da Aaliyah" : "Tocar música da Aaliyah"}
-          >
-            <Music size={13} className={isMusicPlaying ? 'animate-bounce text-rose-400' : ''} />
-            <span className="text-[11px] font-medium tracking-wide">
-              {isMusicPlaying ? 'Aaliyah R&B ♪' : 'Tocar Aaliyah'}
-            </span>
-          </button>
-
-          <button
-            onClick={toggleSound}
-            className="p-1.5 rounded-lg bg-stone-800/80 hover:bg-stone-700 text-stone-300 hover:text-white transition-colors flex items-center gap-1"
-            title={soundEnabled ? "Desativar efeitos sonoros" : "Ativar efeitos sonoros"}
-          >
-            {soundEnabled ? <Volume2 size={13} /> : <VolumeX size={13} />}
-          </button>
-
-          {isEnvelopeOpen && (
-            <button
-              onClick={handleResetEnvelope}
-              className="p-1.5 rounded-lg bg-stone-800/80 hover:bg-stone-700 text-stone-300 hover:text-white transition-colors flex items-center gap-1"
-              title="Fechar envelope novamente"
-            >
-              <RotateCcw size={13} />
-              <span className="hidden md:inline text-[11px]">Reabrir</span>
-            </button>
-          )}
-
-          <button
-            onClick={() => setIsFullScreenView(!isFullScreenView)}
-            className="p-1.5 rounded-lg bg-stone-800/80 hover:bg-stone-700 text-stone-300 hover:text-white transition-colors"
-            title={isFullScreenView ? "Modo celular" : "Expandir"}
-          >
-            {isFullScreenView ? <Smartphone size={13} /> : <Maximize2 size={13} />}
-          </button>
-
-          <button
-            onClick={handleShare}
-            className="p-1.5 rounded-lg bg-rose-900/60 hover:bg-rose-800 text-rose-200 hover:text-white transition-colors flex items-center gap-1"
-            title="Compartilhar Convite"
-          >
-            {copiedLink ? <Check size={13} className="text-emerald-400" /> : <Share2 size={13} />}
-          </button>
-        </div>
-      </header>
-
-      {/* CONTAINER PRINCIPAL DO CONVITE (FORMATO CANVA / SMARTPHONE STORY) */}
-      <div 
-        className={`relative z-10 w-full h-[100dvh] sm:h-[820px] transition-all duration-300 ${
-          activePage === 'planilha'
-            ? 'max-w-4xl sm:max-h-[92vh] sm:rounded-3xl'
-            : isFullScreenView 
-            ? 'max-w-xl sm:h-[880px] rounded-none sm:rounded-3xl' 
-            : 'max-w-[420px] sm:max-h-[92vh] sm:rounded-3xl'
-        } shadow-[0_20px_60px_rgba(0,0,0,0.85)] border-0 sm:border border-stone-800/80 bg-[#e8e2d8] overflow-hidden flex flex-col justify-between`}
-      >
-        {/* Camada 1: Envelope de Capa Fechado com Dobradiça e Cereja */}
-        {activePage !== 'planilha' && (
-          <EnvelopeCover 
-            isOpen={isEnvelopeOpen} 
-            onOpen={handleOpenEnvelope} 
-          />
-        )}
-
-        {/* Camada 2: Conteúdo Interno do Convite */}
-        <div className="relative w-full h-full flex-1 overflow-hidden">
+        <div className={`relative w-full h-full overflow-hidden ${isEnvelopeOpen && activePage === 'convite' ? 'pb-[82px]' : ''}`}>
           <AnimatePresence mode="wait">
             {activePage === 'convite' && (
               <motion.div
                 key="page-convite"
-                initial={{ opacity: 0, scale: 0.98 }}
+                initial={{ opacity: 0, scale: 0.992 }}
                 animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.98 }}
-                transition={{ duration: 0.3 }}
+                exit={{ opacity: 0, scale: 0.992 }}
+                transition={{ duration: 0.22 }}
                 className="w-full h-full"
               >
                 <MainInvitationCard
                   onOpenObservacoes={() => setActivePage('observacoes')}
                   onOpenComoChegar={() => setIsLocationModalOpen(true)}
-                  onOpenConfirmarPresenca={(tab) => {
-                    setRsvpModalTab(tab || 'form');
-                    setIsRsvpModalOpen(true);
-                  }}
+                  onOpenConfirmarPresenca={() => setIsRsvpModalOpen(true)}
                   onOpenSugestoesPresentes={() => setActivePage('presentes')}
-                  onOpenPlanilha={() => {
-                    setIsEnvelopeOpen(true);
-                    setActivePage('planilha');
-                  }}
                   onOpenCalendar={() => setIsCalendarModalOpen(true)}
                 />
               </motion.div>
@@ -256,10 +124,10 @@ export default function App() {
             {activePage === 'observacoes' && (
               <motion.div
                 key="page-observacoes"
-                initial={{ opacity: 0, x: 20 }}
+                initial={{ opacity: 0, x: 14 }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.3 }}
+                exit={{ opacity: 0, x: -14 }}
+                transition={{ duration: 0.22 }}
                 className="w-full h-full"
               >
                 <ObservationsView onBack={() => setActivePage('convite')} />
@@ -269,159 +137,65 @@ export default function App() {
             {activePage === 'presentes' && (
               <motion.div
                 key="page-presentes"
-                initial={{ opacity: 0, x: 20 }}
+                initial={{ opacity: 0, x: 14 }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.3 }}
+                exit={{ opacity: 0, x: -14 }}
+                transition={{ duration: 0.22 }}
                 className="w-full h-full"
               >
                 <GiftSuggestionsView onBack={() => setActivePage('convite')} />
               </motion.div>
             )}
-
-            {activePage === 'planilha' && (
-              <motion.div
-                key="page-planilha"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.3 }}
-                className="w-full h-full"
-              >
-                <SpreadsheetView
-                  onBack={() => setActivePage('convite')}
-                  onOpenNewRsvp={() => setIsRsvpModalOpen(true)}
-                />
-              </motion.div>
-            )}
           </AnimatePresence>
         </div>
 
-        {/* BARRA INFERIOR DE NAVEGAÇÃO ENTRE PÁGINAS COM TOCADOR DE MÚSICA DO CANVA */}
-        {(isEnvelopeOpen || activePage === 'planilha') && (
-          <div className="relative z-20 w-full bg-[#141213]/95 backdrop-blur-md border-t border-white/10 px-3 py-2 flex items-center justify-between text-xs shrink-0">
-            {/* Navegação entre páginas */}
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => {
-                  sound.playClick();
-                  setActivePage('convite');
-                }}
-                className={`flex flex-col items-center gap-1 transition-all cursor-pointer ${
-                  activePage === 'convite' ? 'text-rose-400 font-bold' : 'text-stone-400 hover:text-stone-200'
-                }`}
-              >
-                <Mail size={16} />
-                <span className="text-[11px]">Convite</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  sound.playClick();
-                  setActivePage('observacoes');
-                }}
-                className={`flex flex-col items-center gap-1 transition-all cursor-pointer ${
-                  activePage === 'observacoes' ? 'text-rose-400 font-bold' : 'text-stone-400 hover:text-stone-200'
-                }`}
-              >
-                <FileText size={16} />
-                <span className="text-[11px]">Observações</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  sound.playClick();
-                  setActivePage('presentes');
-                }}
-                className={`flex flex-col items-center gap-1 transition-all cursor-pointer ${
-                  activePage === 'presentes' ? 'text-rose-400 font-bold' : 'text-stone-400 hover:text-stone-200'
-                }`}
-              >
-                <Gift size={16} />
-                <span className="text-[11px]">Presentes</span>
-              </button>
-
-              {activePage === 'planilha' && (
-                <button
-                  onClick={() => {
-                    sound.playClick();
-                    setActivePage('planilha');
-                  }}
-                  className="flex flex-col items-center gap-1 text-rose-400 font-semibold cursor-pointer"
-                >
-                  <Table size={16} />
-                  <span className="text-[11px]">Planilha</span>
-                </button>
-              )}
-            </div>
-
-            {/* Widget de Música Idêntico ao Print do Canva */}
+        {/* Utilidades discretas. Spotify é secundário, RSVP é a ação principal. */}
+        {isEnvelopeOpen && (
+          <div className="absolute top-[max(10px,env(safe-area-inset-top))] right-3 z-30 flex items-center gap-2">
+            <SpotifyMiniPlayer />
             <button
-              onClick={toggleMusic}
-              className="bg-[#221c1e] hover:bg-[#2c2427] border border-white/15 text-stone-100 rounded-full py-1 px-2.5 shadow-md flex items-center gap-2 transition-all cursor-pointer active:scale-95"
-              title="Trilha sonora Aaliyah R&B"
+              type="button"
+              onClick={handleShare}
+              aria-label="Compartilhar convite"
+              className="w-10 h-10 rounded-full bg-white/80 backdrop-blur-xl border border-black/10 shadow-lg flex items-center justify-center text-[#1d1d1f] active:scale-95 transition-transform"
             >
-              <div className="w-6 h-6 rounded-md bg-sky-200 text-stone-900 flex items-center justify-center font-bold shrink-0">
-                <Music size={13} className={isMusicPlaying ? 'animate-bounce' : ''} />
-              </div>
-
-              <div className="text-left leading-tight">
-                <div className="text-[10px] font-bold text-rose-200">
-                  {isMusicPlaying ? 'Música ligada' : 'Música pausada'}
-                </div>
-                <div className="text-[9px] text-stone-400 truncate max-w-[80px]">
-                  Cherry Y2K Night
-                </div>
-              </div>
-
-              <div className="flex items-end gap-0.5 h-2.5 pl-0.5">
-                <span className={`w-0.5 bg-rose-400 rounded-full transition-all ${isMusicPlaying ? 'h-2.5 animate-pulse' : 'h-1'}`} />
-                <span className={`w-0.5 bg-rose-300 rounded-full transition-all ${isMusicPlaying ? 'h-2 animate-bounce' : 'h-1'}`} />
-                <span className={`w-0.5 bg-rose-400 rounded-full transition-all ${isMusicPlaying ? 'h-2.5 animate-pulse' : 'h-1'}`} />
-              </div>
+              {copiedLink ? <Check size={17} className="text-emerald-600" /> : <Share2 size={16} />}
             </button>
+          </div>
+        )}
+
+        {/* CTA persistente — foco real do produto: saber quem vai. */}
+        {isEnvelopeOpen && !isRsvpModalOpen && activePage === 'convite' && (
+          <div className="absolute left-0 right-0 bottom-0 z-30 px-2.5 pb-[max(9px,calc(env(safe-area-inset-bottom)+7px))] pt-7 bg-gradient-to-t from-[#e8e2d8] via-[#e8e2d8]/88 to-transparent pointer-events-none">
+            <div className="pointer-events-auto min-h-[66px] rounded-[22px] bg-white/82 backdrop-blur-2xl border border-white/70 shadow-[0_12px_35px_rgba(0,0,0,.18)] px-3 py-2.5 flex items-center justify-between gap-3">
+              <div className="min-w-0 flex items-center gap-2.5">
+                <span className={`w-2.5 h-2.5 shrink-0 rounded-full ${userRsvp?.status === 'confirmed' ? 'bg-emerald-500' : userRsvp?.status === 'declined' ? 'bg-zinc-400' : 'bg-[#7b071c]'}`} />
+                <div className="min-w-0 leading-tight">
+                  <strong className="block truncate text-[13px] tracking-[-.01em] text-[#1d1d1f]">{statusLabel}</strong>
+                  <span className="block truncate text-[10.5px] mt-1 text-[#6e6e73]">{statusCaption}</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsRsvpModalOpen(true)}
+                className="shrink-0 min-w-[94px] h-11 rounded-[15px] bg-[#1d1d1f] text-white text-[13px] font-semibold shadow-md active:scale-[.98] transition-transform"
+              >
+                {userRsvp?.status ? 'Editar' : 'Responder'}
+              </button>
+            </div>
           </div>
         )}
       </div>
 
-      {/* MODAIS INTERATIVOS */}
-      <CalendarModal
-        isOpen={isCalendarModalOpen}
-        onClose={() => setIsCalendarModalOpen(false)}
-      />
-
-      <LocationModal 
-        isOpen={isLocationModalOpen} 
-        onClose={() => setIsLocationModalOpen(false)} 
-      />
-
-      <RsvpModal 
-        isOpen={isRsvpModalOpen} 
-        onClose={() => setIsRsvpModalOpen(false)}
-        initialTab={rsvpModalTab}
-        onOpenSpreadsheet={() => {
-          setIsEnvelopeOpen(true);
-          setActivePage('planilha');
+      <LocationModal isOpen={isLocationModalOpen} onClose={() => setIsLocationModalOpen(false)} />
+      <CalendarModal isOpen={isCalendarModalOpen} onClose={() => setIsCalendarModalOpen(false)} />
+      <RsvpModal
+        isOpen={isRsvpModalOpen}
+        onClose={() => {
+          setIsRsvpModalOpen(false);
+          refreshLocalRsvp();
         }}
       />
-
-      {/* Dica de rodapé e link secreto da anfitriã para celular */}
-      <footer className="mt-2 text-center text-[11px] text-stone-500 flex items-center justify-center gap-2">
-        <span>XV da Duda • 12 de Dezembro</span>
-        <span className="text-stone-700">•</span>
-        <button
-          onClick={() => {
-            sound.playClick();
-            setIsEnvelopeOpen(true);
-            setActivePage('planilha');
-          }}
-          className="text-stone-600 hover:text-stone-400 transition-colors flex items-center gap-1 text-[10px]"
-          title="Acesso restrito da anfitriã"
-        >
-          <Lock size={10} />
-          <span>Painel</span>
-        </button>
-      </footer>
     </div>
   );
 }
