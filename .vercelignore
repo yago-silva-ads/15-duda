@@ -3,6 +3,6 @@
 .verification/
 .env*
 !.env.example
-data/
+/data/
 node_modules/
 dist/
