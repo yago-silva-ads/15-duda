@@ -1,3 +1,5 @@
+import { config } from 'dotenv';
+import rsvpHandler from './api/rsvp';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
@@ -7,9 +9,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+config({ path: '.env.local' });
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
 app.use(express.json());
+app.post('/api/rsvp', rsvpHandler);
 
 // Diretório de dados persistentes
 const DATA_DIR = path.resolve(__dirname, 'data');
@@ -166,7 +170,7 @@ app.get('/api/rsvps/export.csv', (req, res) => {
   const rsvps = readRSVPs();
   
   // Headers CSV
-  const headers = ['Status', 'Nome Completo', 'Telefone', 'Total Adultos', 'Total Criancas', 'Roupa de Banho', 'Mensagem / Observacao', 'Data e Hora'];
+  const headers = ['Status', 'Nome Completo', 'Telefone', 'Convidados principais', 'Total Criancas', 'Roupa de Banho', 'Mensagem / Observacao', 'Data e Hora'];
   
   const rows = rsvps.map((r: any) => {
     const statusLabel = r.status === 'confirmed' ? 'CONFIRMADO (VAI)' : 'NAO CONFIRMADO (NAO VAI)';

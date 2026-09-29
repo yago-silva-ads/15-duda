@@ -27,13 +27,12 @@ export const INVITATION_DATA = {
   targetDateISO: "2026-12-12T13:00:00",
   
   location: {
-    name: "Espaço Jardins Real & Piscina",
-    address: "Estrada dos Pinheiros, 1250 - Bairro das Flores",
-    city: "São Paulo - SP",
-    reference: "Próximo à rotatória principal do lago",
-    mapsUrl: "https://maps.google.com/?q=Estrada+dos+Pinheiros+1250",
-    wazeUrl: "https://waze.com/ul?q=Estrada+dos+Pinheiros+1250",
-    uberDestination: "Estrada dos Pinheiros, 1250"
+    name: "PlanoB EVENTOS",
+    address: "R. Guian, 238 - Jd Campestre",
+    city: "São Paulo - SP, 04330-090",
+    mapsUrl: "https://maps.app.goo.gl/8H5zkmYbiJxnaWgQ7",
+    wazeUrl: "https://waze.com/ul?q=R.%20Guian%2C%20238%20-%20Jd%20Campestre%2C%20São%20Paulo%20-%20SP%2C%2004330-090&navigate=yes",
+    uberDestination: "R. Guian, 238 - Jd Campestre, São Paulo - SP, 04330-090"
   },
 
   pix: {
@@ -106,7 +105,7 @@ export const INVITATION_DATA = {
     },
     {
       id: "bebidas",
-      title: "Adultos, tragam sua própria bebida alcoólica."
+      title: "Maiores de 18 anos, tragam sua própria bebida alcoólica."
     },
     {
       id: "convidados",

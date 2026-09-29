@@ -1,0 +1,19 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//XV da Duda//Convite//PT-BR
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-TIMEZONE:America/Sao_Paulo
+BEGIN:VEVENT
+UID:xv-da-duda-20261212@15-da-duda-convite.vercel.app
+DTSTAMP:20260929T154100Z
+DTSTART:20261212T160000Z
+DTEND:20261213T000000Z
+SUMMARY:XV da Duda
+LOCATION:PlanoB EVENTOS\, R. Guian\, 238 - Jd Campestre\, São Paulo - SP
+ \, 04330-090
+DESCRIPTION:XV da Duda. Dress code: anos 2000. Como chegar: https://maps.
+ app.goo.gl/8H5zkmYbiJxnaWgQ7
+URL:https://15-da-duda-convite.vercel.app
+END:VEVENT
+END:VCALENDAR

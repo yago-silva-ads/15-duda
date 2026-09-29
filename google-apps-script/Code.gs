@@ -41,10 +41,14 @@ function doPost(e) {
     const name = sanitize_(payload.name, 120);
     const phone = normalizePhone_(payload.phone);
     const status = payload.status === 'confirmed' ? 'confirmed' : payload.status === 'declined' ? 'declined' : '';
-    const adults = status === 'confirmed' ? clamp_(payload.adults, 1, 10) : 0;
+    const adults = status === 'confirmed' ? 1 : 0;
     const kids = status === 'confirmed' ? clamp_(payload.kids, 0, 10) : 0;
-    const swimwear = status === 'confirmed' ? Boolean(payload.bringingSwimwear) : false;
-    const message = sanitize_(payload.message, 500);
+    const swimwear = status === 'confirmed' && (payload.age < 18 || kids > 0) ? Boolean(payload.bringingSwimwear) : false;
+    const age = payload.age;
+    if (!Number.isInteger(age) || age < 0 || age > 120) throw new Error('Idade inválida.');
+    const children = status === 'confirmed' ? payload.children : [];
+    if (!Array.isArray(children) || children.length !== kids || children.some(c => !c || !String(c.name || '').trim() || !Number.isInteger(c.age) || c.age < 0 || c.age > 17)) throw new Error('Crianças inválidas.');
+    const message = sanitize_(payload.observation == null ? payload.message : payload.observation, 400);
 
     if (name.length < 3) throw new Error('Nome inválido.');
     if (phone.length < 10 || phone.length > 13) throw new Error('Telefone inválido.');
@@ -79,6 +83,8 @@ function doPost(e) {
       message,
       firstResponse,
       now,
+      age,
+      children.map(c => sanitize_(c.name, 120) + ' (' + c.age + ' anos)').join('; '),
     ];
 
     if (rowIndex) sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
@@ -106,8 +112,8 @@ function ensureResponses_(ss) {
   if (!sheet) sheet = ss.insertSheet(SHEET_RESPONSES);
 
   const headers = [
-    'Status', 'WhatsApp', 'Nome', 'Adultos', 'Crianças', 'Total de pessoas',
-    'Roupa de banho', 'Observação', 'Primeira resposta', 'Última atualização'
+    'Status', 'WhatsApp', 'Nome', 'Convidado principal', 'Crianças', 'Total de pessoas',
+    'Roupa de banho', 'Observação', 'Primeira resposta', 'Última atualização', 'Idade', 'Nome e idade das crianças'
   ];
 
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
@@ -123,7 +129,7 @@ function ensureResponses_(ss) {
 
 function updateViews_(ss) {
   const source = ensureResponses_(ss);
-  const data = source.getLastRow() > 1 ? source.getRange(2, 1, source.getLastRow() - 1, 10).getValues() : [];
+  const data = source.getLastRow() > 1 ? source.getRange(2, 1, source.getLastRow() - 1, 12).getValues() : [];
   writeView_(ss, SHEET_CONFIRMED, data.filter(row => row[0] === 'CONFIRMADO'), '#e9f7ee');
   writeView_(ss, SHEET_DECLINED, data.filter(row => row[0] === 'NÃO VAI'), '#fbecee');
 }
@@ -132,12 +138,12 @@ function writeView_(ss, name, rows, color) {
   let sheet = ss.getSheetByName(name);
   if (!sheet) sheet = ss.insertSheet(name);
   sheet.clearContents().clearFormats();
-  const headers = ['Nome', 'WhatsApp', 'Adultos', 'Crianças', 'Total', 'Observação', 'Atualizado em'];
+  const headers = ['Nome', 'WhatsApp', 'Convidado principal', 'Crianças', 'Total', 'Observação', 'Atualizado em', 'Idade', 'Nome e idade das crianças'];
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   styleHeader_(sheet, headers.length);
   sheet.setFrozenRows(1);
 
-  const mapped = rows.map(row => [row[2], row[1], row[3], row[4], row[5], row[7], row[9]]);
+  const mapped = rows.map(row => [row[2], row[1], row[3], row[4], row[5], row[7], row[9], row[10], row[11]]);
   if (mapped.length) {
     sheet.getRange(2, 1, mapped.length, headers.length).setValues(mapped).setBackground(color);
     sheet.getRange(2, 7, mapped.length, 1).setNumberFormat('dd/MM/yyyy HH:mm');
@@ -147,7 +153,7 @@ function writeView_(ss, name, rows, color) {
 
 function updateSummary_(ss) {
   const source = ensureResponses_(ss);
-  const data = source.getLastRow() > 1 ? source.getRange(2, 1, source.getLastRow() - 1, 10).getValues() : [];
+  const data = source.getLastRow() > 1 ? source.getRange(2, 1, source.getLastRow() - 1, 12).getValues() : [];
   const confirmed = data.filter(row => row[0] === 'CONFIRMADO');
   const declined = data.filter(row => row[0] === 'NÃO VAI');
   const people = confirmed.reduce((sum, row) => sum + Number(row[5] || 0), 0);
@@ -177,12 +183,12 @@ function styleHeader_(sheet, columns) {
 }
 
 function styleResponseRow_(sheet, row, status) {
-  sheet.getRange(row, 1, 1, 10).setBackground(status === 'confirmed' ? '#e9f7ee' : '#fbecee');
+  sheet.getRange(row, 1, 1, 12).setBackground(status === 'confirmed' ? '#e9f7ee' : '#fbecee');
   sheet.getRange(row, 1).setFontWeight('bold');
 }
 
-function normalizePhone_(value) { return String(value || '').replace(/\D/g, ''); }
-function sanitize_(value, max) { return String(value || '').replace(/[<>]/g, '').trim().slice(0, max); }
+function normalizePhone_(value) { const phone = String(value || '').replace(/\D/g, ''); return phone.startsWith('55') && phone.length >= 12 ? phone.slice(2) : phone; }
+function sanitize_(value, max) { const text = String(value || '').replace(/[<>]/g, '').trim().slice(0, max); return /^[=+@-]/.test(text) ? "'" + text : text; }
 function clamp_(value, min, max) {
   const parsed = parseInt(value, 10);
   return Number.isNaN(parsed) ? min : Math.max(min, Math.min(max, parsed));

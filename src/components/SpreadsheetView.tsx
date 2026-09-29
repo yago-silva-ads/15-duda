@@ -265,7 +265,7 @@ export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({ onBack, onOpen
             {totalConfirmedPeople} <span className="text-xs font-normal text-emerald-300">pessoas</span>
           </div>
           <span className="text-[10px] text-emerald-400/80">
-            {totalAdultsConfirmed} adultos, {totalKidsConfirmed} crianças
+            {totalAdultsConfirmed} convidados principais, {totalKidsConfirmed} crianças
           </span>
         </div>
 

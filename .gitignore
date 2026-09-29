@@ -6,3 +6,8 @@ coverage/
 *.log
 .env*
 !.env.example
+.vercel
+.backup-scroll-canva/
+.backup-xv-*/
+.verification/
+data/settings.json

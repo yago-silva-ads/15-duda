@@ -2,6 +2,9 @@ export interface RsvpEntry {
   id: string;
   name: string;
   phone: string;
+  age: number;
+  children: { name: string; age: number }[];
+  totalPeople: number;
   status: 'confirmed' | 'declined';
   adults: number;
   kids: number;
@@ -31,19 +34,6 @@ function upsertLocal(entry: RsvpEntry) {
   }
 }
 
-async function postToSheets(entry: Omit<RsvpEntry, 'id' | 'createdAt'>) {
-  if (!WEBHOOK_URL) throw new Error('RSVP ainda não foi conectado à planilha.');
-
-  // text/plain evita preflight CORS no Apps Script.
-  // mode no-cors impede leitura da resposta, então a planilha valida/upserta do lado servidor.
-  await fetch(WEBHOOK_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ ...entry, event: 'XV da Duda' }),
-  });
-}
-
 export async function fetchRsvps(): Promise<RsvpEntry[]> {
   // Mantido para compatibilidade com partes antigas do projeto.
   // O fluxo público novo não expõe a lista de convidados.
@@ -71,61 +61,13 @@ export async function fetchRsvps(): Promise<RsvpEntry[]> {
 }
 
 export async function submitRsvp(entry: Omit<RsvpEntry, 'id' | 'createdAt'>): Promise<{ success: boolean; data?: RsvpEntry; error?: string }> {
-  const now = new Date().toISOString();
-  const localEntry: RsvpEntry = {
-    ...entry,
-    id: `rsvp-${digits(entry.phone) || Date.now()}`,
-    createdAt: now,
-  };
-
-  // Produção: nunca finge que salvou. Google Sheets é a fonte oficial.
-  if (!import.meta.env.DEV) {
-    if (!WEBHOOK_URL) {
-      return {
-        success: false,
-        error: 'A confirmação está em configuração. Tente novamente em alguns minutos.',
-      };
-    }
-
-    try {
-      await postToSheets(entry);
-      upsertLocal(localEntry);
-      return { success: true, data: localEntry };
-    } catch (error: any) {
-      return { success: false, error: error?.message || 'Não foi possível enviar sua resposta.' };
-    }
-  }
-
-  // Desenvolvimento local: tenta webhook, depois servidor Express original e por fim cache.
-  if (WEBHOOK_URL) {
-    try {
-      await postToSheets(entry);
-      upsertLocal(localEntry);
-      return { success: true, data: localEntry };
-    } catch {
-      // tenta API local abaixo
-    }
-  }
-
   try {
-    const res = await fetch('/api/rsvps', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(entry),
-    });
-    if (res.ok) {
-      const result = await res.json();
-      if (result.success) {
-        upsertLocal(result.data || localEntry);
-        return result;
-      }
-    }
-  } catch {
-    // fallback local abaixo
-  }
-
-  upsertLocal(localEntry);
-  return { success: true, data: localEntry };
+    const response = await fetch('/api/rsvp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(entry), signal: AbortSignal.timeout(25000) });
+    const result = await response.json();
+    if (!response.ok || result.success !== true) return { success: false, error: result.error || 'Não foi possível registrar sua resposta.' };
+    upsertLocal(result.data);
+    return result;
+  } catch { return { success: false, error: 'Não foi possível confirmar o registro. Tente novamente com o mesmo WhatsApp.' }; }
 }
 
 export async function deleteRsvp(id: string): Promise<boolean> {

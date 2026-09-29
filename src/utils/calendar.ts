@@ -6,7 +6,7 @@
 import { INVITATION_DATA } from '../data/invitationData';
 
 export function getGoogleCalendarUrl(): string {
-  const title = encodeURIComponent("XV da Duda - Festa de 15 Anos");
+  const title = encodeURIComponent("XV da Duda");
   const details = encodeURIComponent(
     "Festa de 15 Anos da Duda! 🎉\n\n" +
     "Dress Code: Anos 2000's (Y2K)\n" +
@@ -22,47 +22,20 @@ export function getGoogleCalendarUrl(): string {
   const startDate = "20261212T160000Z";
   const endDate = "20261213T000000Z";
 
-  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startDate}/${endDate}&details=${details}&location=${location}`;
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&ctz=America%2FSao_Paulo&text=${title}&dates=${startDate}/${endDate}&details=${details}&location=${location}`;
 }
 
 export function downloadIcsCalendarFile(): void {
-  const icsContent = [
-    "BEGIN:VCALENDAR",
-    "VERSION:2.0",
-    "PRODID:-//XV da Duda//Convite Interativo//PT-BR",
-    "CALSCALE:GREGORIAN",
-    "METHOD:PUBLISH",
-    "BEGIN:VEVENT",
-    "UID:xv-duda-20261212@studio",
-    "DTSTAMP:20260928T120000Z",
-    "DTSTART:20261212T160000Z",
-    "DTEND:20261213T000000Z",
-    "SUMMARY:XV da Duda - Festa de 15 Anos",
-    "DESCRIPTION:Festa de 15 Anos da Duda!\\nDress Code: Anos 2000's (Y2K).\\nProibido vermelho e oncinha.\\nTragam roupas de banho!",
-    `LOCATION:${INVITATION_DATA.location.name}\\, ${INVITATION_DATA.location.address}\\, ${INVITATION_DATA.location.city}`,
-    "STATUS:CONFIRMED",
-    "BEGIN:VALARM",
-    "TRIGGER:-P1D",
-    "ACTION:DISPLAY",
-    "DESCRIPTION:Lembrete: XV da Duda é amanhã!",
-    "END:VALARM",
-    "END:VEVENT",
-    "END:VCALENDAR"
-  ].join("\r\n");
-
-  const blob = new Blob([icsContent], { type: "text/calendar;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.setAttribute("download", "XV_da_Duda.ics");
+  const link = document.createElement('a');
+  link.href = '/xv-da-duda.ics';
+  link.download = 'xv-da-duda.ics';
   document.body.appendChild(link);
   link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  link.remove();
 }
 
 export function getOutlookCalendarUrl(): string {
-  const title = encodeURIComponent("XV da Duda - Festa de 15 Anos");
+  const title = encodeURIComponent("XV da Duda");
   const details = encodeURIComponent(
     "Festa de 15 Anos da Duda! Dress Code: Anos 2000's. Local: " + INVITATION_DATA.location.name
   );
