@@ -1,4 +1,5 @@
-@import "tailwindcss";
+@import "tailwindcss" source(none);
+@source "./";
 :root { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:#17100f; color:#fff; font-synthesis:none; -webkit-font-smoothing:antialiased; }
 * { box-sizing:border-box; }
 html,body,#root { width:100%; min-width:320px; min-height:100%; margin:0; }
@@ -71,8 +72,8 @@ body { overflow: auto; }
 .page-section { width:min(100%,540px); margin:0 auto 16px; scroll-margin-top:12px; }
 .canva-stage { width:100%; max-width:none; max-height:none; border-radius:0; aspect-ratio:1080 / 1919; }
 .canva-page { position:relative; object-fit:contain; height:auto; }
-.page-section.arrived .canva-page { animation:page-entry .9s ease-out both; }
-@keyframes page-entry { from { opacity:.65; transform:scale(1.015) translateY(8px); } to { opacity:1; transform:none; } }
+.page-section.arrived .canva-stage { animation:page-entry .9s ease-out both; }
+@keyframes page-entry { from { opacity:.65; transform:scale(.99) translateY(8px); } to { opacity:1; transform:none; } }
 .sparkles { position:absolute; inset:0; pointer-events:none; }
 .sparkles span { position:absolute; font-size:16px; color:#a30019; animation:twinkle 4s ease-in-out infinite; }
 .sparkles span:nth-child(1) { top:3%; left:3%; }

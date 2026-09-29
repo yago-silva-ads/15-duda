@@ -1,0 +1,8 @@
+.backup-scroll-canva/
+.backup-xv-*/
+.verification/
+.env*
+!.env.example
+data/
+node_modules/
+dist/
