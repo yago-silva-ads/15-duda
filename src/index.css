@@ -108,6 +108,22 @@ body { overflow: auto; }
 .dialog button:disabled { opacity:.45; cursor:wait; }
 .dialog .choice { display:flex; align-items:center; gap:10px; padding:12px; border:1px solid #d5c3c8; border-radius:12px; }
 .dialog input[type=radio], .dialog input[type=checkbox] { width:20px; height:20px; accent-color:#770b25; flex-shrink:0; }
+.age-options { margin:14px 0; padding:0; border:0; }
+.age-options legend { padding:0; font-size:14px; font-weight:600; }
+.dialog .choice--age { margin:8px 0; cursor:pointer; transition:border-color .15s ease, background-color .15s ease, box-shadow .15s ease; }
+.choice--age span { flex:1; }
+.choice--age small { color:#6d4a53; font-size:13px; font-weight:500; }
+.choice--age:has(input:checked) { border-color:#770b25; background:#f9e8ed; box-shadow:0 0 0 1px #770b25; }
+.location-photo-trigger { display:block; width:100%; padding:0; margin:0; border:0; text-align:left; overflow:hidden; background:transparent!important; }
+.location-name { display:block; margin:0; color:#261a1d; font-size:20px; font-weight:700; }
+.location-pool-photo { display:block; width:100%; aspect-ratio:16 / 9; margin:14px 0; border-radius:14px; object-fit:cover; background:#eee5e8; }
+.location-photo-trigger:hover .location-pool-photo, .location-photo-trigger:focus-visible .location-pool-photo { box-shadow:0 0 0 3px #bd5170; }
+.location-photo-link { display:block; width:max-content; margin:8px auto 0; color:#770b25; font-size:13px; font-weight:600; }
+.location-lightbox { position:fixed; z-index:110; inset:0; display:grid; place-items:center; padding:20px; background:#17090de6; }
+.location-lightbox-content { position:relative; width:min(94vw,720px); }
+.location-lightbox-content img { display:block; width:100%; max-height:78dvh; border-radius:16px; object-fit:contain; background:#17090d; }
+.location-lightbox-content a { display:block; width:max-content; margin:12px auto 0; color:#fff; font-size:14px; font-weight:600; }
+.location-lightbox-close { position:absolute; z-index:1; top:8px; right:8px; min-height:36px!important; padding:2px 12px!important; border:1px solid #fff7!important; border-radius:999px!important; background:#261a1de6!important; color:#fff!important; font-size:24px; line-height:1; }
 .hint { font-weight:400; font-size:13px; line-height:1.5; opacity:.85; }
 .counter { display:flex; gap:12px; align-items:center; }
 .counter strong { margin-right:auto; }

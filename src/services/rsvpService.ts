@@ -2,7 +2,7 @@ export interface RsvpEntry {
   id: string;
   name: string;
   phone: string;
-  age: number;
+  age: string;
   children: { name: string; age: number }[];
   totalPeople: number;
   status: 'confirmed' | 'declined';

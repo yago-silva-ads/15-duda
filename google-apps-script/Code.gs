@@ -43,9 +43,9 @@ function doPost(e) {
     const status = payload.status === 'confirmed' ? 'confirmed' : payload.status === 'declined' ? 'declined' : '';
     const adults = status === 'confirmed' ? 1 : 0;
     const kids = status === 'confirmed' ? clamp_(payload.kids, 0, 10) : 0;
-    const swimwear = status === 'confirmed' && (payload.age < 18 || kids > 0) ? Boolean(payload.bringingSwimwear) : false;
+    const swimwear = status === 'confirmed' && (payload.age !== 'Adulto (18+)' || kids > 0) ? Boolean(payload.bringingSwimwear) : false;
     const age = payload.age;
-    if (!Number.isInteger(age) || age < 0 || age > 120) throw new Error('Idade inválida.');
+    if (!['Criança (0–11)', 'Adolescente (12–17)', 'Adulto (18+)'].includes(age)) throw new Error('Faixa etária inválida.');
     const children = status === 'confirmed' ? payload.children : [];
     if (!Array.isArray(children) || children.length !== kids || children.some(c => !c || !String(c.name || '').trim() || !Number.isInteger(c.age) || c.age < 0 || c.age > 17)) throw new Error('Crianças inválidas.');
     const message = sanitize_(payload.observation == null ? payload.message : payload.observation, 400);

@@ -14,7 +14,7 @@ function RsvpForm({ onClose, onConfirmed }: Props) {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const hasMinor = Number(age) < 18 || children.length > 0;
+  const hasMinor = age !== 'Adulto (18+)' || children.length > 0;
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('duda_user_rsvp') || 'null');
@@ -27,7 +27,7 @@ function RsvpForm({ onClose, onConfirmed }: Props) {
     return () => clearTimeout(timer);
   }, [step, status, onClose, onConfirmed]);
   const close = () => { if (!busy) { onClose(); if (step === 3 && status === 'confirmed') onConfirmed?.(); } };
-  return <Dialog title={step === 1 ? 'Quem é você?' : step === 2 ? 'Você vai estar lá?' : 'Resposta registrada'} onClose={close}>
+  return <Dialog title={step === 1 ? 'Confirme sua presença ' : step === 2 ? 'Você vai estar lá?' : 'Resposta registrada'} onClose={close}>
     {step === 3 ? <p role="status">{status === 'confirmed' ? 'Presença confirmada! Te esperamos no XV da Duda.' : 'Obrigada por avisar. Sua resposta foi registrada.'}</p> :
     <form onSubmit={async e => {
       e.preventDefault(); setError('');
@@ -39,7 +39,7 @@ function RsvpForm({ onClose, onConfirmed }: Props) {
       if (!status || busy) return;
       setBusy(true);
       const attending = status === 'confirmed';
-      const result = await submitRsvp({ name: name.trim(), age: Number(age), phone, status, adults: attending ? 1 : 0,
+      const result = await submitRsvp({ name: name.trim(), age, phone, status, adults: attending ? 1 : 0,
         kids: attending ? children.length : 0, children: attending ? children.map(c => ({ name: c.name.trim(), age: Number(c.age) })) : [],
         totalPeople: attending ? 1 + children.length : 0, bringingSwimwear: attending && hasMinor && swimwear, message: message.trim() });
       setBusy(false);
@@ -49,7 +49,12 @@ function RsvpForm({ onClose, onConfirmed }: Props) {
     }}>
       {step === 1 ? <>
         <label>Nome completo<input autoFocus required autoComplete="name" maxLength={120} value={name} onChange={e => setName(e.target.value)} /></label>
-        <label>Idade<input required type="number" inputMode="numeric" min="0" max="120" step="1" value={age} onChange={e => setAge(e.target.value)} /></label>
+        <fieldset className="age-options">
+          <legend>Idade</legend>
+          <label className="choice choice--age"><input required type="radio" name="age" value="Criança (0–11)" checked={age === 'Criança (0–11)'} onChange={e => setAge(e.target.value)} /><span>Criança</span><small>0–11 anos</small></label>
+          <label className="choice choice--age"><input required type="radio" name="age" value="Adolescente (12–17)" checked={age === 'Adolescente (12–17)'} onChange={e => setAge(e.target.value)} /><span>Adolescente</span><small>12–17 anos</small></label>
+          <label className="choice choice--age"><input required type="radio" name="age" value="Adulto (18+)" checked={age === 'Adulto (18+)'} onChange={e => setAge(e.target.value)} /><span>Adulto</span><small>18+ anos</small></label>
+        </fieldset>
         <label>WhatsApp<input required type="tel" autoComplete="tel-national" inputMode="tel" value={phone} onChange={e => setPhone(e.target.value)} /></label>
         <p className="hint">Use o mesmo WhatsApp para atualizar sua resposta.</p>
         <button className="primary">Continuar</button>
